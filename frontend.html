@@ -1,0 +1,189 @@
+<!DOCTYPE html>
+<html lang="uz">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AI Assistant</title>
+    <style>
+        * { box-sizing: border-box; }
+        body {
+            margin: 0; padding: 20px; font-family: Inter, system-ui, sans-serif;
+            background: linear-gradient(180deg, #020617 0%, #0f172a 100%);
+            color: #e2e8f0; min-height: 100vh;
+        }
+        .container { max-width: 1200px; margin: 0 auto; }
+        .header { margin-bottom: 24px; }
+        .header h1 { margin: 0 0 8px; font-size: 2.5rem; }
+        .header p { margin: 0; color: #cbd5e1; }
+        .status { margin-top: 12px; display: inline-block; padding: 10px 18px; border-radius: 999px; background: rgba(99, 102, 241, 0.18); color: #e0e7ff; border: 1px solid rgba(99, 102, 241, 0.35); }
+        .layout { display: grid; grid-template-columns: 2fr 1fr; gap: 24px; }
+        .panel { background: rgba(15, 23, 42, 0.94); border: 1px solid rgba(148, 163, 184, 0.14); border-radius: 24px; padding: 24px; }
+        .panel h2 { margin: 0 0 8px; }
+        .panel p { color: #cbd5e1; margin: 0; }
+        .chat-window { min-height: 420px; max-height: 620px; border-radius: 24px; background: rgba(15, 23, 42, 0.82); border: 1px solid rgba(148, 163, 184, 0.12); padding: 22px; overflow-y: auto; display: flex; flex-direction: column; gap: 16px; margin: 20px 0; }
+        .empty-state { color: #94a3b8; text-align: center; padding: 40px 0; }
+        .message-group { display: grid; gap: 12px; }
+        .message { padding: 18px; border-radius: 22px; line-height: 1.75; white-space: pre-wrap; }
+        .message-label { display: block; font-size: 0.9rem; color: #cbd5e1; margin-bottom: 8px; }
+        .msg-user { background: rgba(59, 130, 246, 0.12); border: 1px solid rgba(59, 130, 246, 0.18); }
+        .msg-assistant { background: rgba(16, 185, 129, 0.14); border: 1px solid rgba(16, 185, 129, 0.18); }
+        .input-area { display: grid; gap: 16px; margin-top: 20px; }
+        textarea { width: 100%; min-height: 120px; resize: vertical; background: rgba(15, 23, 42, 0.85); border: 1px solid rgba(148, 163, 184, 0.22); border-radius: 20px; padding: 18px; color: #e2e8f0; font: inherit; }
+        .actions { display: flex; gap: 12px; flex-wrap: wrap; }
+        button { border: none; border-radius: 16px; padding: 12px 20px; cursor: pointer; transition: all 0.18s ease; }
+        .btn-primary { background: linear-gradient(135deg, #6366f1, #818cf8); color: #fff; }
+        .btn-primary:hover { transform: translateY(-1px); box-shadow: 0 18px 30px rgba(99, 102, 241, 0.2); }
+        .btn-chip { background: rgba(148, 163, 184, 0.08); color: #e2e8f0; border: 1px solid rgba(148, 163, 184, 0.22); border-radius: 999px; padding: 8px 14px; }
+        .btn-chip:hover { background: rgba(99, 102, 241, 0.16); }
+        .error { margin-top: 14px; padding: 16px; border-radius: 18px; background: rgba(248, 113, 113, 0.18); color: #fecaca; }
+        .info { background: rgba(255, 255, 255, 0.04); border: 1px solid rgba(148, 163, 184, 0.12); border-radius: 20px; padding: 22px; margin-bottom: 18px; }
+        .info h3 { margin-top: 0; }
+        .info ul { padding-left: 18px; color: #cbd5e1; }
+        .info li { margin-bottom: 8px; }
+        .loading { opacity: 0.6; }
+        @media (max-width: 960px) { .layout { grid-template-columns: 1fr; } }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>🤖 AI Chat Assistant</h1>
+            <p>Savolingizni yozing, AI javob bersin. Backend: FastAPI, Frontend: Vanilla JS</p>
+            <div class="status" id="status">⏳ Serverga ulanmoqda...</div>
+        </div>
+        
+        <div class="layout">
+            <div class="panel">
+                <div style="display: flex; justify-content: space-between; align-items: center;">
+                    <div>
+                        <h2>💬 Suhbat</h2>
+                        <p>Soʻrovlar va javoblar bu yerda ko'rinadi</p>
+                    </div>
+                    <button class="btn-chip" onclick="clearChat()">Tozalash</button>
+                </div>
+                
+                <div class="chat-window" id="chatWindow">
+                    <div class="empty-state">Suhbat boshlang...</div>
+                </div>
+                
+                <div class="input-area">
+                    <textarea id="questionInput" placeholder="Savolingizni bu yerga yozing... (Enter: yuborish, Shift+Enter: yangi qator)"></textarea>
+                    <div class="actions">
+                        <button class="btn-primary" onclick="sendQuestion()">📤 Yuborish</button>
+                        <button class="btn-chip" onclick="insertExample('Python kodini yozib ber')">💻 Kod</button>
+                        <button class="btn-chip" onclick="insertExample('Bu nima qilayapti?')">❓ Tushuntir</button>
+                        <button class="btn-chip" onclick="insertExample('UX nima?')">🎨 UX</button>
+                    </div>
+                    <div id="error"></div>
+                </div>
+            </div>
+            
+            <div class="panel">
+                <div class="info">
+                    <h3>ℹ️ Haqida</h3>
+                    <p>Local AI modeli bilan chat. FastAPI backend, HTML/JS frontend.</p>
+                </div>
+                <div class="info">
+                    <h3>⚙️ Texnika</h3>
+                    <ul>
+                        <li>Backend: Python FastAPI</li>
+                        <li>Model: Hugging Face</li>
+                        <li>Frontend: Vanilla JS</li>
+                        <li>CORS: Sozlangan</li>
+                    </ul>
+                </div>
+                <div class="info">
+                    <h3>📍 Manzillar</h3>
+                    <ul>
+                        <li>Frontend: http://localhost</li>
+                        <li>API: http://localhost:8000</li>
+                        <li>Status: <span id="apiStatus">❌ Offline</span></li>
+                    </ul>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const API_URL = 'http://localhost:8000';
+        let chatHistory = [];
+        
+        async function checkStatus() {
+            try {
+                const res = await fetch(API_URL + '/api/status');
+                const data = await res.json();
+                document.getElementById('status').textContent = `✅ Model: ${data.model} · Qurilma: ${data.device}`;
+                document.getElementById('apiStatus').textContent = '✅ Online';
+            } catch (e) {
+                document.getElementById('status').textContent = '❌ Backend offline';
+                document.getElementById('apiStatus').textContent = '❌ Offline';
+            }
+        }
+        
+        async function sendQuestion() {
+            const q = document.getElementById('questionInput').value.trim();
+            if (!q) return;
+            
+            const btn = event.target;
+            btn.disabled = true;
+            btn.textContent = '⏳ Yuborilmoqda...';
+            
+            try {
+                const res = await fetch(API_URL + '/api/chat', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({question: q, history: chatHistory})
+                });
+                const data = await res.json();
+                if (!res.ok) throw new Error(data.detail || 'Server xatosi');
+                
+                chatHistory = data.history;
+                renderChat();
+                document.getElementById('questionInput').value = '';
+                document.getElementById('error').innerHTML = '';
+            } catch (e) {
+                document.getElementById('error').innerHTML = `<strong>❌ Xato:</strong> ${e.message}`;
+            } finally {
+                btn.disabled = false;
+                btn.textContent = '📤 Yuborish';
+            }
+        }
+        
+        function renderChat() {
+            const w = document.getElementById('chatWindow');
+            if (!chatHistory.length) {
+                w.innerHTML = '<div class="empty-state">Suhbat boshlang...</div>';
+                return;
+            }
+            w.innerHTML = chatHistory.map(([q, a], i) => `
+                <div class="message-group">
+                    <div class="message msg-user"><span class="message-label">Siz</span><p>${q}</p></div>
+                    <div class="message msg-assistant"><span class="message-label">Assistant</span><p>${a}</p></div>
+                </div>
+            `).join('');
+            w.scrollTop = w.scrollHeight;
+        }
+        
+        function clearChat() {
+            chatHistory = [];
+            renderChat();
+        }
+        
+        function insertExample(text) {
+            document.getElementById('questionInput').value = text;
+            document.getElementById('questionInput').focus();
+        }
+        
+        document.getElementById('questionInput').addEventListener('keydown', e => {
+            if (e.key === 'Enter' && !e.shiftKey) {
+                e.preventDefault();
+                sendQuestion();
+            }
+        });
+        
+        // Boshlash
+        checkStatus();
+        setInterval(checkStatus, 5000);
+    </script>
+</body>
+</html>
