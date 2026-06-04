@@ -1,29 +1,37 @@
 import { useEffect, useRef, useState } from 'react';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
+import { API_ERROR_MSG, fetchStatus, fileToBase64, sendChat } from './api';
 
 const samplePrompts = [
-  'Iltimos, men uchun Python kodini yozib bering.',
-  'Bu kod nima qilayotganini soddaroq tushuntiring.',
-  'Men UX dizayn haqida nima bilishim kerak?',
+  'Rasmni tahlil qiling',
+  'Bu kodni tushuntiring',
+  'Qisqa javob bering',
 ];
 
 function App() {
   const [question, setQuestion] = useState('');
   const [chatHistory, setChatHistory] = useState([]);
-  const [status, setStatus] = useState('Model yuklanmoqda...');
+  const [status, setStatus] = useState('Ulanish tekshirilmoqda…');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+  const [imageFile, setImageFile] = useState(null);
+  const [imagePreview, setImagePreview] = useState('');
+  const [audioFile, setAudioFile] = useState(null);
+  const [recording, setRecording] = useState(false);
   const scrollRef = useRef(null);
+  const imageInputRef = useRef(null);
+  const audioInputRef = useRef(null);
+  const mediaRecorderRef = useRef(null);
+  const audioChunksRef = useRef([]);
 
   useEffect(() => {
-    fetch('/api/status')
-      .then((res) => res.json())
+    fetchStatus()
       .then((payload) => {
-        setStatus(`Model: ${payload.model} · Qurilma: ${payload.device} · Bilimlar: ${payload.knowledge_size}`);
+        setStatus(`${payload.model} · ${payload.device}`);
       })
       .catch(() => {
-        setStatus('Backend ulanmayapti — iltimos, serverni ishga tushiring.');
+        setStatus('Server ulanmagan');
       });
   }, []);
 
@@ -33,35 +41,112 @@ function App() {
     }
   }, [chatHistory, loading]);
 
+  useEffect(() => {
+    return () => {
+      if (imagePreview) URL.revokeObjectURL(imagePreview);
+    };
+  }, [imagePreview]);
+
+  const clearAttachments = () => {
+    setImageFile(null);
+    if (imagePreview) URL.revokeObjectURL(imagePreview);
+    setImagePreview('');
+    setAudioFile(null);
+  };
+
+  const onImagePick = (event) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+    setImageFile(file);
+    if (imagePreview) URL.revokeObjectURL(imagePreview);
+    setImagePreview(URL.createObjectURL(file));
+    setAudioFile(null);
+    event.target.value = '';
+  };
+
+  const onAudioPick = (event) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+    setAudioFile(file);
+    setImageFile(null);
+    if (imagePreview) URL.revokeObjectURL(imagePreview);
+    setImagePreview('');
+    event.target.value = '';
+  };
+
+  const startRecording = async () => {
+    if (!navigator.mediaDevices?.getUserMedia) {
+      setError('Mikrofon qo‘llab-quvvatlanmaydi.');
+      return;
+    }
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      const recorder = new MediaRecorder(stream);
+      audioChunksRef.current = [];
+      recorder.ondataavailable = (e) => {
+        if (e.data.size > 0) audioChunksRef.current.push(e.data);
+      };
+      recorder.onstop = () => {
+        stream.getTracks().forEach((t) => t.stop());
+        const blob = new Blob(audioChunksRef.current, { type: 'audio/webm' });
+        setAudioFile(new File([blob], 'ovoz.webm', { type: 'audio/webm' }));
+        setImageFile(null);
+        if (imagePreview) URL.revokeObjectURL(imagePreview);
+        setImagePreview('');
+      };
+      mediaRecorderRef.current = recorder;
+      recorder.start();
+      setRecording(true);
+    } catch {
+      setError('Mikrofonga ruxsat bering.');
+    }
+  };
+
+  const stopRecording = () => {
+    if (mediaRecorderRef.current?.state === 'recording') {
+      mediaRecorderRef.current.stop();
+    }
+    setRecording(false);
+  };
+
   const sendQuestion = async () => {
-    if (!question.trim()) return;
+    const text = question.trim();
+    if (!text && !imageFile && !audioFile) return;
+
     setLoading(true);
     setError('');
 
-    const currentQuestion = question.trim();
-    setQuestion('');
-    
-    // Add temporary user message while loading
-    setChatHistory(prev => [...prev, { question: currentQuestion, answer: '' }]);
+    const displayQuestion =
+      text ||
+      (imageFile ? '📷 Rasm yuborildi' : '') ||
+      (audioFile ? '🎤 Ovoz yuborildi' : '');
 
-    const historyPayload = chatHistory.map((item) => [item.question, item.answer]);
-    const payload = { question: currentQuestion, history: historyPayload };
+    const currentQuestion = text;
+    setQuestion('');
+    setChatHistory((prev) => [...prev, { question: displayQuestion, answer: '', imageUrl: imagePreview }]);
 
     try {
-      const res = await fetch('/api/chat', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(payload),
-      });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.detail || 'Server xatosi');
-      
-      setChatHistory(data.history.map(([q, a]) => ({ question: q, answer: a })));
-    } catch (err) {
-      setError(err.message || 'Savol yuborishda xatolik yuz berdi.');
-      // Remove the temp message if failed
-      setChatHistory(prev => prev.slice(0, -1));
-      setQuestion(currentQuestion); // Restore question
+      const payload = {
+        question: currentQuestion || 'Faylni tahlil qiling va qisqa javob bering.',
+        history: chatHistory.map((item) => [item.question, item.answer]),
+      };
+
+      if (imageFile) {
+        payload.image_base64 = await fileToBase64(imageFile);
+        payload.image_mime = imageFile.type || 'image/jpeg';
+      }
+      if (audioFile) {
+        payload.audio_base64 = await fileToBase64(audioFile);
+        payload.audio_mime = audioFile.type || 'audio/webm';
+      }
+
+      const data = await sendChat(payload);
+      setChatHistory(data.history.map(([q, a]) => ({ question: q, answer: a, imageUrl: '' })));
+      clearAttachments();
+    } catch {
+      setError(API_ERROR_MSG);
+      setChatHistory((prev) => prev.slice(0, -1));
+      setQuestion(currentQuestion);
     } finally {
       setLoading(false);
     }
@@ -74,129 +159,155 @@ function App() {
     }
   };
 
-  const sendExample = (example) => {
-    setQuestion(example);
-  };
-
   const clearChat = () => {
     setChatHistory([]);
     setError('');
+    clearAttachments();
   };
 
   return (
-    <div className="page-shell">
-      <div className="background-glow"></div>
-      
-      <div className="hero-panel">
-        <div>
-          <h1 className="gradient-text">AI Chat Assistant</h1>
-          <p>React frontend va FastAPI backend bilan ishlangan intellektual yordamchi.</p>
-          <div className="status-chip">
-            <span className="status-dot"></span>
-            {status}
+    <div className="app">
+      <header className="topbar">
+        <div className="brand">
+          <span className="brand-mark">AI</span>
+          <div>
+            <h1>Yordamchi</h1>
+            <p className="brand-sub">{status}</p>
           </div>
         </div>
-      </div>
+        <button type="button" className="btn-text" onClick={clearChat}>
+          Tozalash
+        </button>
+      </header>
 
-      <div className="layout-grid">
-        <section className="chat-panel glass-panel">
-          <div className="panel-header">
-            <div>
-              <h2>Suhbat</h2>
-              <p>Soʻrovlaringiz va AI javoblari ushbu maydonda ko'rinadi.</p>
+      <main className="chat-shell">
+        <div className="messages" ref={scrollRef}>
+          {chatHistory.length === 0 ? (
+            <div className="welcome">
+              <h2>Salom!</h2>
+              <p>Matn, rasm yoki ovoz yuboring — javob shu yerda chiqadi.</p>
+              <div className="prompt-grid">
+                {samplePrompts.map((sample) => (
+                  <button
+                    key={sample}
+                    type="button"
+                    className="prompt-card"
+                    onClick={() => setQuestion(sample)}
+                    disabled={loading}
+                  >
+                    {sample}
+                  </button>
+                ))}
+              </div>
             </div>
-            <button className="ghost-button" onClick={clearChat} title="Chatni tozalash">
-              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M3 6h18"></path><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"></path><path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"></path></svg>
+          ) : (
+            chatHistory.map((item, index) => (
+              <article key={index} className="thread">
+                <div className="bubble user">
+                  {item.imageUrl && (
+                    <img src={item.imageUrl} alt="Yuborilgan rasm" className="msg-image" />
+                  )}
+                  <p>{item.question}</p>
+                </div>
+                {item.answer ? (
+                  <div className="bubble bot">
+                    <div className="markdown-content">
+                      <ReactMarkdown remarkPlugins={[remarkGfm]}>{item.answer}</ReactMarkdown>
+                    </div>
+                  </div>
+                ) : (
+                  loading && (
+                    <div className="bubble bot typing">
+                      <span />
+                      <span />
+                      <span />
+                    </div>
+                  )
+                )}
+              </article>
+            ))
+          )}
+        </div>
+
+        {(imagePreview || audioFile) && (
+          <div className="attach-bar">
+            {imagePreview && <img src={imagePreview} alt="" className="attach-thumb" />}
+            {audioFile && (
+              <span className="attach-tag">🎤 {audioFile.name || 'Ovoz yozuvi'}</span>
+            )}
+            <button type="button" className="attach-remove" onClick={clearAttachments} aria-label="Olib tashlash">
+              ×
+            </button>
+          </div>
+        )}
+
+        {error && <div className="alert">{error}</div>}
+
+        <footer className="composer">
+          <input
+            ref={imageInputRef}
+            type="file"
+            accept="image/*"
+            hidden
+            onChange={onImagePick}
+          />
+          <input
+            ref={audioInputRef}
+            type="file"
+            accept="audio/*"
+            hidden
+            onChange={onAudioPick}
+          />
+
+          <div className="composer-tools">
+            <button
+              type="button"
+              className="icon-btn"
+              title="Rasm yuklash"
+              onClick={() => imageInputRef.current?.click()}
+              disabled={loading}
+            >
+              📷
+            </button>
+            <button
+              type="button"
+              className="icon-btn"
+              title="Ovoz fayli"
+              onClick={() => audioInputRef.current?.click()}
+              disabled={loading}
+            >
+              📎
+            </button>
+            <button
+              type="button"
+              className={`icon-btn ${recording ? 'recording' : ''}`}
+              title={recording ? 'Yozuvni to‘xtatish' : 'Ovoz yozish'}
+              onClick={recording ? stopRecording : startRecording}
+              disabled={loading}
+            >
+              {recording ? '⏹' : '🎤'}
             </button>
           </div>
 
-          <div className="chat-window" ref={scrollRef}>
-            {chatHistory.length === 0 ? (
-              <div className="empty-state">
-                <div className="empty-icon">✨</div>
-                <h3>Suhbatni boshlang</h3>
-                <p>Istagan savolingizni pastdagi maydonga yozing.</p>
-              </div>
-            ) : (
-              chatHistory.map((item, index) => (
-                <div key={index} className="message-group">
-                  <div className="message user fade-in">
-                    <span className="message-label">Siz</span>
-                    <p>{item.question}</p>
-                  </div>
-                  {item.answer ? (
-                    <div className="message assistant fade-in">
-                      <span className="message-label">Assistant</span>
-                      <div className="markdown-content">
-                        <ReactMarkdown remarkPlugins={[remarkGfm]}>
-                          {item.answer}
-                        </ReactMarkdown>
-                      </div>
-                    </div>
-                  ) : (
-                    loading && (
-                      <div className="message assistant fade-in">
-                        <span className="message-label">Assistant o'ylamoqda...</span>
-                        <div className="loading-dots">
-                          <span></span><span></span><span></span>
-                        </div>
-                      </div>
-                    )
-                  )}
-                </div>
-              ))
-            )}
-          </div>
+          <textarea
+            value={question}
+            onChange={(e) => setQuestion(e.target.value)}
+            onKeyDown={handleKeyDown}
+            placeholder="Xabar yozing…"
+            rows={2}
+            disabled={loading}
+          />
 
-          <div className="query-panel">
-            <textarea
-              value={question}
-              onChange={(event) => setQuestion(event.target.value)}
-              onKeyDown={handleKeyDown}
-              placeholder="Savolingizni bu yerga yozing... (Enter - yuborish)"
-              rows={3}
-              disabled={loading}
-            />
-            <div className="query-actions">
-              <button className="primary-button" onClick={sendQuestion} disabled={loading || !question.trim()}>
-                {loading ? 'Yuborilmoqda...' : 'Yuborish'}
-                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{marginLeft: '8px'}}><line x1="22" y1="2" x2="11" y2="13"></line><polygon points="22 2 15 22 11 13 2 9 22 2"></polygon></svg>
-              </button>
-            </div>
-            
-            <div className="example-row">
-              {samplePrompts.map((sample) => (
-                <button key={sample} className="chip" onClick={() => sendExample(sample)} disabled={loading}>
-                  {sample}
-                </button>
-              ))}
-            </div>
-          </div>
-
-          {error && <div className="error-box fade-in">{error}</div>}
-        </section>
-
-        <aside className="info-panel">
-          <div className="panel-card glass-panel fade-in" style={{animationDelay: '0.1s'}}>
-            <h3><span className="icon">🚀</span> Zamonaviy Dizayn</h3>
-            <p>
-              Glassmorphism uslubidagi shaffof dizayn va premium interfeys bilan yangilandi.
-            </p>
-          </div>
-          <div className="panel-card glass-panel fade-in" style={{animationDelay: '0.2s'}}>
-            <h3><span className="icon">⚡</span> Kuchli Backend</h3>
-            <ul>
-              <li>FastAPI orqali ulanish</li>
-              <li>Markdown yordamida chiroyli kodlar</li>
-              <li>Avtomatlashtirilgan startup</li>
-            </ul>
-          </div>
-          <div className="panel-card glass-panel fade-in" style={{animationDelay: '0.3s'}}>
-            <h3><span className="icon">💡</span> Maslahat</h3>
-            <p>Kod qismlari, jadvallar yoki qalin matnni kiritib ko'ring — tizim uni to'liq formatlab beradi.</p>
-          </div>
-        </aside>
-      </div>
+          <button
+            type="button"
+            className="send-btn"
+            onClick={sendQuestion}
+            disabled={loading || (!question.trim() && !imageFile && !audioFile)}
+          >
+            {loading ? '…' : 'Yuborish'}
+          </button>
+        </footer>
+      </main>
     </div>
   );
 }

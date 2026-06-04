@@ -5,13 +5,13 @@ import os
 import urllib.error
 import urllib.request
 from pathlib import Path
-from typing import List
+from typing import List, Optional
 
 try:
     from dotenv import load_dotenv
 except ImportError:
     load_dotenv = None
-from fastapi import FastAPI
+from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse
 from pydantic import BaseModel
@@ -32,9 +32,16 @@ app.add_middleware(
     allow_headers=['*'],
 )
 
+API_ERROR_MSG = "Hatolik yuzaga keldi. Iltimos yana bir urinib ko'ring."
+
+
 class ChatRequest(BaseModel):
     question: str
     history: List[List[str]] = []
+    image_base64: Optional[str] = None
+    image_mime: Optional[str] = None
+    audio_base64: Optional[str] = None
+    audio_mime: Optional[str] = None
 
 class ChatResponse(BaseModel):
     answer: str
@@ -80,7 +87,32 @@ def ask_ollama(question: str) -> str:
     return str(data)
 
 
-def ask_google_gemini(question: str) -> str:
+def build_gemini_parts(
+    question: str,
+    image_base64: Optional[str] = None,
+    image_mime: Optional[str] = None,
+    audio_base64: Optional[str] = None,
+    audio_mime: Optional[str] = None,
+) -> list:
+    parts = []
+    if question.strip():
+        parts.append({'text': question})
+    if image_base64 and image_mime:
+        parts.append({'inline_data': {'mime_type': image_mime, 'data': image_base64}})
+    if audio_base64 and audio_mime:
+        parts.append({'inline_data': {'mime_type': audio_mime, 'data': audio_base64}})
+    if not parts:
+        parts.append({'text': 'Salom'})
+    return parts
+
+
+def ask_google_gemini(
+    question: str,
+    image_base64: Optional[str] = None,
+    image_mime: Optional[str] = None,
+    audio_base64: Optional[str] = None,
+    audio_mime: Optional[str] = None,
+) -> str:
     if not GOOGLE_API_KEY:
         raise RuntimeError('GOOGLE_API_KEY yoki OPENAI_API_KEY aniqlanmagan')
 
@@ -88,9 +120,9 @@ def ask_google_gemini(question: str) -> str:
     payload = {
         'contents': [
             {
-                'parts': [
-                    {'text': question}
-                ]
+                'parts': build_gemini_parts(
+                    question, image_base64, image_mime, audio_base64, audio_mime
+                )
             }
         ]
     }
@@ -150,12 +182,25 @@ def get_simple_response(question: str) -> str:
     )
 
 
-def get_ai_response(question: str) -> str:
+def get_ai_response(
+    question: str,
+    image_base64: Optional[str] = None,
+    image_mime: Optional[str] = None,
+    audio_base64: Optional[str] = None,
+    audio_mime: Optional[str] = None,
+) -> str:
+    has_media = bool(image_base64 or audio_base64)
+
+    if has_media and not GOOGLE_API_KEY:
+        raise HTTPException(status_code=503, detail=API_ERROR_MSG)
+
     if GOOGLE_API_KEY:
         try:
-            return ask_google_gemini(question)
+            return ask_google_gemini(
+                question, image_base64, image_mime, audio_base64, audio_mime
+            )
         except Exception as exc:
-            return f'Google Gemini API javob bera olmadi: {exc}.\n\n' + get_simple_response(question)
+            raise HTTPException(status_code=503, detail=API_ERROR_MSG) from exc
 
     if ollama_available():
         try:
@@ -191,8 +236,20 @@ def status():
 
 @app.post('/api/chat', response_model=ChatResponse)
 def chat(request: ChatRequest):
-    answer = get_ai_response(request.question)
-    history = request.history + [[request.question, answer]]
+    label = request.question
+    if request.image_base64 and not label.strip():
+        label = '📷 Rasm'
+    if request.audio_base64 and not label.strip():
+        label = '🎤 Ovoz'
+
+    answer = get_ai_response(
+        request.question,
+        request.image_base64,
+        request.image_mime,
+        request.audio_base64,
+        request.audio_mime,
+    )
+    history = request.history + [[label, answer]]
     return {'answer': answer, 'history': history}
 
 

@@ -78,5 +78,36 @@ So‘ng `.gitignore` fayliga `.env` qo‘shilgan, shuning uchun u versiyalashga 
 
 ### Google Gemini API ni ishlatish
 
-Agar `GOOGLE_API_KEY` o‘rnatilgan bo‘lsa, backend `gemini-flash-latest` modeliga so‘rov yuboradi va frontendga natijani qaytaradi.
+Agar `GOOGLE_API_KEY` o‘rnatilgan bo‘lsa, backend `gemini-flash-latest` modeliga so‘rov yuboradi va frontendga natijani qaytaradi. **Rasm va ovoz** yuborish uchun ham `GOOGLE_API_KEY` kerak.
+
+### Frontend imkoniyatlari
+
+- Yangi yengil dizayn (chat markazida)
+- Rasm yuklash (📷) va ovoz (🎤 yozish yoki 📎 fayl)
+- API ishlamasa: `Hatolik yuzaga keldi. Iltimos yana bir urinib ko'ring.`
+
+### Vercel + GitHub
+
+| Qism | Vercel? | Izoh |
+|------|---------|------|
+| **React frontend** (`frontend/`) | Ha | GitHub repo ulab, Root Directory = `frontend` |
+| **Python backend** (`simple_backend.py`) | Yo‘q* | Og‘ir model / uzoq so‘rovlar uchun [Render](https://render.com), [Railway](https://railway.app) yoki [Fly.io](https://fly.io) yaxshiroq |
+
+\* Faqat Gemini API chaqiradigan yengil backendni Vercel Serverless Python bilan ham qilish mumkin, lekin `main.py` dagi katta PyTorch modeli Vercelga mos emas.
+
+**Deploy qadamlari:**
+
+1. Repo GitHubga push qiling.
+2. [vercel.com](https://vercel.com) → New Project → repongizni tanlang.
+3. **Root Directory:** `frontend`
+4. Environment: `VITE_API_URL` = backend manzili (masalan `https://your-api.onrender.com`)
+5. Backendni alohida hostingda ishga tushiring va `GOOGLE_API_KEY` ni u yerda Environment Variables ga qo‘ying.
+
+Lokal ishga tushirish (yengil backend):
+
+```bash
+python simple_backend.py
+cd frontend && npm run dev
+```
+
 # my-AI
