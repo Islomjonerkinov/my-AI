@@ -193,3 +193,7 @@ def main():
 
 if __name__ == '__main__':
     main()
+
+from backend import app  # shu 1 qatorni qo'shing
+
+from backend import app  # shu 1 qatorni qo'shing
