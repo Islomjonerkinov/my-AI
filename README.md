@@ -123,3 +123,4 @@ cd frontend && npm run dev
 ```
 
 # my-AI
+# AI-2
