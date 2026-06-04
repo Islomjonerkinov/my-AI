@@ -1,7 +1,14 @@
 export const API_ERROR_MSG =
   "Hatolik yuzaga keldi. Iltimos yana bir urinib ko'ring.";
 
-const API_BASE = import.meta.env.VITE_API_URL || '';
+export const MISSING_API_URL_MSG =
+  "Vercelda VITE_API_URL o'rnatilmagan. Settings → Environment Variables → backend manzilingizni qo'shing.";
+
+const API_BASE = (import.meta.env.VITE_API_URL || '').replace(/\/$/, '');
+
+export function isApiConfigured() {
+  return Boolean(API_BASE);
+}
 
 export function apiUrl(path) {
   return `${API_BASE}${path}`;

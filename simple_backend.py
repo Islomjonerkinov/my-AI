@@ -219,6 +219,11 @@ async def serve_html():
     return {'error': 'chat.html not found'}
 
 
+@app.get('/health')
+def health():
+    return {'ok': True}
+
+
 @app.get('/api/status')
 def status():
     if ollama_available():

@@ -97,11 +97,23 @@ Agar `GOOGLE_API_KEY` o‘rnatilgan bo‘lsa, backend `gemini-flash-latest` mode
 
 **Deploy qadamlari:**
 
-1. Repo GitHubga push qiling.
+1. Repo GitHubga push qiling (`vercel.json` loyiha ildizida bo‘lishi kerak).
 2. [vercel.com](https://vercel.com) → New Project → repongizni tanlang.
-3. **Root Directory:** `frontend`
-4. Environment: `VITE_API_URL` = backend manzili (masalan `https://your-api.onrender.com`)
-5. Backendni alohida hostingda ishga tushiring va `GOOGLE_API_KEY` ni u yerda Environment Variables ga qo‘ying.
+3. **Root Directory** — ikkala variant ishlaydi:
+   - **Bo‘sh qoldiring** (ildiz) — `vercel.json` avtomatik `frontend/` dan build qiladi
+   - Yoki `frontend` deb yozing — faqat frontend papkasi
+4. **Environment Variables** (majburiy): `VITE_API_URL` = `https://your-api.onrender.com` (oxirida `/` bo‘lmasin)
+5. Backendni alohida hostingda ishga tushiring va `GOOGLE_API_KEY` ni u yerda qo‘ying.
+
+### Vercelda tez-tez chiqadigan xatolar
+
+| Xato / belgi | Sabab | Yechim |
+|--------------|--------|--------|
+| `package.json` topilmadi | Root Directory noto‘g‘ri | Root = bo‘sh yoki `frontend`; yangi `vercel.json` ni push qiling |
+| Build failed / `npm` | `node_modules` yuklangan | GitHubga faqat kod; `node_modules` commit qilmang |
+| Sayt ochiladi, lekin chat ishlamaydi | Backend Vercelda yo‘q | `VITE_API_URL` ni Vercel → Settings → Environment Variables ga qo‘ying, **Redeploy** |
+| `Hatolik yuzaga keldi…` | API ishlamayapti | Backend ishlayaptimi? URL to‘g‘rimi? `GOOGLE_API_KEY` bormi? |
+| 404 `/api/...` | Frontend API ni o‘zida qidiradi | `VITE_API_URL` bo‘lmasa so‘rovlar Vercelga ketadi — env qo‘shing |
 
 Lokal ishga tushirish (yengil backend):
 

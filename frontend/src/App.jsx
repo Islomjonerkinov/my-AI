@@ -1,7 +1,14 @@
 import { useEffect, useRef, useState } from 'react';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
-import { API_ERROR_MSG, fetchStatus, fileToBase64, sendChat } from './api';
+import {
+  API_ERROR_MSG,
+  MISSING_API_URL_MSG,
+  fetchStatus,
+  fileToBase64,
+  isApiConfigured,
+  sendChat,
+} from './api';
 
 const samplePrompts = [
   'Rasmni tahlil qiling',
@@ -26,12 +33,23 @@ function App() {
   const audioChunksRef = useRef([]);
 
   useEffect(() => {
+    if (import.meta.env.PROD && !isApiConfigured()) {
+      setStatus('API manzili sozlanmagan');
+      setError(MISSING_API_URL_MSG);
+      return;
+    }
+
     fetchStatus()
       .then((payload) => {
         setStatus(`${payload.model} · ${payload.device}`);
       })
       .catch(() => {
         setStatus('Server ulanmagan');
+        if (import.meta.env.PROD) {
+          setError(
+            `${API_ERROR_MSG} (Vercelda VITE_API_URL to'g'ri backend URL ga o'rnatilganini tekshiring.)`,
+          );
+        }
       });
   }, []);
 
