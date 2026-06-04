@@ -190,10 +190,9 @@ def main():
     tokenizer, model = load_model(model_name)
     interactive_chat(tokenizer, model)
 
+from backend import app  # ← ENG YUQORIGA, boshqa import'lar yoniga
+
+# ... qolgan kod ...
 
 if __name__ == '__main__':
     main()
-
-from backend import app  # shu 1 qatorni qo'shing
-
-from backend import app  # shu 1 qatorni qo'shing
