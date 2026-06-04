@@ -5,3 +5,17 @@
   "outputDirectory": "frontend/dist",
   "rewrites": [{ "source": "/(.*)", "destination": "/index.html" }]
 }
+{
+  "builds": [
+    {
+      "src": "backend.py",
+      "use": "@vercel/python"
+    }
+  ],
+  "routes": [
+    {
+      "src": "/(.*)",
+      "dest": "backend.py"
+    }
+  ]
+}
