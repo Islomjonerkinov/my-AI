@@ -4,3 +4,12 @@
   "outputDirectory": "dist",
   "rewrites": [{ "source": "/(.*)", "destination": "/index.html" }]
 }
+
+{
+  "buildCommand": "pip install -r requirements.txt",
+  "functions": {
+    "backend.py": {
+      "runtime": "python3.9"
+    }
+  }
+}
