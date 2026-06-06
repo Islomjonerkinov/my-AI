@@ -1,0 +1,485 @@
+<!DOCTYPE html>
+<html lang="uz">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>AI Assistant</title>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@3.19.0/dist/tabler-icons.min.css" />
+<style>
+* { box-sizing: border-box; margin: 0; padding: 0; }
+:root {
+  --sidebar-w: 220px;
+  --header-h: 52px;
+  --bg: #ffffff;
+  --bg2: #f7f7f8;
+  --bg3: #efefef;
+  --border: rgba(0,0,0,0.12);
+  --border2: rgba(0,0,0,0.20);
+  --text: #0d0d0d;
+  --text2: #6e6e80;
+  --text3: #acacbe;
+  --info-bg: #e8f0fe;
+  --info-text: #1a56db;
+  --danger: #dc2626;
+  --radius: 8px;
+  --radius-lg: 12px;
+}
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #1e1e1e;
+    --bg2: #2a2a2a;
+    --bg3: #333333;
+    --border: rgba(255,255,255,0.12);
+    --border2: rgba(255,255,255,0.22);
+    --text: #ececec;
+    --text2: #9e9eae;
+    --text3: #5c5c6e;
+    --info-bg: #1e3a5f;
+    --info-text: #93c5fd;
+  }
+}
+body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background: var(--bg3); display: flex; align-items: center; justify-content: center; min-height: 100vh; padding: 20px; }
+
+#app {
+  display: flex;
+  width: 100%;
+  max-width: 920px;
+  height: 680px;
+  background: var(--bg);
+  border: 0.5px solid var(--border);
+  border-radius: var(--radius-lg);
+  overflow: hidden;
+  box-shadow: 0 4px 32px rgba(0,0,0,0.10);
+}
+
+#sidebar {
+  width: var(--sidebar-w);
+  background: var(--bg2);
+  border-right: 0.5px solid var(--border);
+  display: flex;
+  flex-direction: column;
+  padding: 12px 8px;
+  gap: 4px;
+}
+.sidebar-title { font-size: 11px; font-weight: 500; color: var(--text3); padding: 4px 8px 8px; letter-spacing: 0.05em; text-transform: uppercase; }
+
+.new-chat-btn {
+  display: flex; align-items: center; gap: 8px;
+  padding: 8px 10px; border-radius: var(--radius);
+  border: 0.5px solid var(--border2); background: var(--bg);
+  color: var(--text); font-size: 13px; cursor: pointer;
+  margin-bottom: 8px; width: 100%;
+}
+.new-chat-btn:hover { background: var(--bg3); }
+
+.chat-item {
+  display: flex; align-items: center; gap: 8px;
+  padding: 7px 10px; border-radius: var(--radius);
+  font-size: 12px; color: var(--text2); cursor: pointer;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.chat-item:hover, .chat-item.active { background: var(--bg); color: var(--text); }
+.chat-item i { font-size: 14px; flex-shrink: 0; }
+
+.sidebar-bottom { margin-top: auto; padding-top: 8px; border-top: 0.5px solid var(--border); }
+.kb-btn {
+  display: flex; align-items: center; gap: 8px;
+  padding: 7px 10px; border-radius: var(--radius);
+  font-size: 12px; color: var(--text2); cursor: pointer;
+  width: 100%; background: none; border: none;
+}
+.kb-btn:hover { background: var(--bg); color: var(--text); }
+
+#main { flex: 1; display: flex; flex-direction: column; min-width: 0; position: relative; }
+
+#header {
+  height: var(--header-h); border-bottom: 0.5px solid var(--border);
+  display: flex; align-items: center; padding: 0 16px; gap: 10px;
+}
+.model-badge {
+  display: flex; align-items: center; gap: 6px;
+  padding: 4px 10px; border-radius: 999px;
+  border: 0.5px solid var(--border2); font-size: 12px;
+  font-weight: 500; color: var(--text2); cursor: pointer; background: var(--bg);
+}
+.model-badge:hover { background: var(--bg2); }
+
+.status-dot { width: 7px; height: 7px; border-radius: 50%; background: #22c55e; flex-shrink: 0; }
+.status-dot.offline { background: #ef4444; }
+
+#header-right { margin-left: auto; display: flex; align-items: center; gap: 8px; }
+.lang-select {
+  font-size: 12px; padding: 4px 8px; border-radius: var(--radius);
+  border: 0.5px solid var(--border2); background: var(--bg);
+  color: var(--text2); cursor: pointer;
+}
+
+#messages { flex: 1; overflow-y: auto; padding: 16px; display: flex; flex-direction: column; gap: 16px; }
+#messages::-webkit-scrollbar { width: 4px; }
+#messages::-webkit-scrollbar-thumb { background: var(--border2); border-radius: 4px; }
+
+.msg-row { display: flex; gap: 10px; align-items: flex-start; }
+.msg-row.user { flex-direction: row-reverse; }
+
+.avatar {
+  width: 30px; height: 30px; border-radius: 50%;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 12px; font-weight: 500; flex-shrink: 0;
+}
+.avatar.ai { background: var(--info-bg); color: var(--info-text); border: 0.5px solid var(--border); }
+.avatar.user-av { background: var(--bg2); color: var(--text2); }
+
+.bubble {
+  max-width: 75%; padding: 10px 13px; border-radius: 16px;
+  font-size: 13px; line-height: 1.6; color: var(--text);
+}
+.bubble.ai { background: var(--bg2); border-bottom-left-radius: 4px; }
+.bubble.user { background: var(--info-bg); color: var(--info-text); border-bottom-right-radius: 4px; }
+
+.bubble-meta { font-size: 10px; color: var(--text3); margin-top: 4px; }
+.msg-row.user .bubble-meta { text-align: right; }
+
+.typing-indicator { display: flex; gap: 4px; align-items: center; padding: 4px 0; }
+.typing-indicator span {
+  width: 6px; height: 6px; border-radius: 50%;
+  background: var(--text3); animation: bounce 1.2s infinite;
+}
+.typing-indicator span:nth-child(2) { animation-delay: 0.2s; }
+.typing-indicator span:nth-child(3) { animation-delay: 0.4s; }
+@keyframes bounce { 0%,60%,100%{transform:translateY(0)} 30%{transform:translateY(-6px)} }
+
+#input-area { padding: 12px 16px; border-top: 0.5px solid var(--border); }
+#input-box {
+  display: flex; align-items: flex-end; gap: 8px;
+  background: var(--bg2); border: 0.5px solid var(--border2);
+  border-radius: var(--radius-lg); padding: 8px 10px;
+}
+#input-box:focus-within { border-color: var(--border); }
+
+#msg-input {
+  flex: 1; border: none; background: transparent; font-size: 13px;
+  color: var(--text); resize: none; outline: none;
+  font-family: inherit; max-height: 100px; min-height: 20px; line-height: 1.5;
+}
+
+.send-btn {
+  width: 32px; height: 32px; border-radius: 8px;
+  background: var(--text); color: var(--bg); border: none;
+  cursor: pointer; display: flex; align-items: center; justify-content: center; flex-shrink: 0;
+}
+.send-btn:hover { opacity: 0.8; }
+.send-btn:disabled { opacity: 0.3; cursor: not-allowed; }
+.send-btn i { font-size: 16px; }
+
+.input-footer { display: flex; align-items: center; justify-content: space-between; margin-top: 6px; padding: 0 2px; }
+.input-hint { font-size: 10px; color: var(--text3); }
+
+#kb-panel {
+  display: none; position: absolute; top: 0; left: 0; right: 0; bottom: 0;
+  background: var(--bg); z-index: 10; padding: 20px;
+  flex-direction: column; gap: 12px;
+}
+#kb-panel.open { display: flex; }
+
+.panel-header { display: flex; align-items: center; gap: 10px; padding-bottom: 12px; border-bottom: 0.5px solid var(--border); }
+.panel-header h3 { font-size: 15px; font-weight: 500; flex: 1; color: var(--text); }
+.close-btn {
+  width: 28px; height: 28px; border: 0.5px solid var(--border2);
+  border-radius: var(--radius); background: none; cursor: pointer;
+  display: flex; align-items: center; justify-content: center; color: var(--text2);
+}
+
+#kb-notes { flex: 1; overflow-y: auto; display: flex; flex-direction: column; gap: 8px; }
+.kb-note {
+  padding: 8px 12px; background: var(--bg2);
+  border-radius: var(--radius); font-size: 12px; color: var(--text); line-height: 1.5;
+}
+
+.kb-add { display: flex; gap: 8px; }
+#kb-input {
+  flex: 1; padding: 8px 10px; border: 0.5px solid var(--border2);
+  border-radius: var(--radius); background: var(--bg2);
+  color: var(--text); font-size: 13px; outline: none;
+}
+.add-note-btn {
+  padding: 8px 14px; border-radius: var(--radius);
+  border: 0.5px solid var(--border2); background: var(--bg);
+  color: var(--text); font-size: 12px; cursor: pointer;
+}
+.add-note-btn:hover { background: var(--bg2); }
+.error-msg { font-size: 11px; color: var(--danger); padding: 4px 0; }
+
+@media (max-width: 600px) {
+  body { padding: 0; }
+  #app { border-radius: 0; height: 100vh; max-width: 100%; }
+  #sidebar { display: none; }
+}
+</style>
+</head>
+<body>
+<div id="app">
+  <div id="sidebar">
+    <div class="sidebar-title">Tarix</div>
+    <button class="new-chat-btn" onclick="newChat()">
+      <i class="ti ti-plus"></i> Yangi chat
+    </button>
+    <div class="chat-item active" id="hist-0">
+      <i class="ti ti-message"></i>
+      <span>Joriy suhbat</span>
+    </div>
+    <div class="sidebar-bottom">
+      <button class="kb-btn" onclick="openKb()">
+        <i class="ti ti-database"></i> Bilim bazasi
+      </button>
+    </div>
+  </div>
+
+  <div id="main">
+    <div id="header">
+      <div class="status-dot" id="status-dot"></div>
+      <div class="model-badge">
+        <i class="ti ti-cpu" style="font-size:14px;"></i>
+        <span id="model-name">...</span>
+        <i class="ti ti-chevron-down" style="font-size:12px;"></i>
+      </div>
+      <div id="header-right">
+        <select class="lang-select" id="lang-sel">
+          <option value="uz">O'zbek</option>
+          <option value="ru">Русский</option>
+          <option value="en">English</option>
+        </select>
+      </div>
+    </div>
+
+    <div id="messages">
+      <div class="msg-row">
+        <div class="avatar ai"><i class="ti ti-robot" style="font-size:15px;"></i></div>
+        <div>
+          <div class="bubble ai" id="welcome-msg">Salom! Men sizning AI yordamchingizman. Savolingizni yozing...</div>
+          <div class="bubble-meta" id="welcome-time"></div>
+        </div>
+      </div>
+    </div>
+
+    <div id="input-area">
+      <div id="input-box">
+        <textarea id="msg-input" rows="1" placeholder="Xabar yozing..."></textarea>
+        <button class="send-btn" id="send-btn" onclick="sendMessage()">
+          <i class="ti ti-arrow-up"></i>
+        </button>
+      </div>
+      <div class="input-footer">
+        <span class="input-hint" id="status-text">Backend ulanishi tekshirilmoqda...</span>
+        <span class="input-hint">Enter — yuborish</span>
+      </div>
+    </div>
+
+    <div id="kb-panel">
+      <div class="panel-header">
+        <i class="ti ti-database" style="font-size:18px;color:var(--text2);"></i>
+        <h3>Bilim bazasi</h3>
+        <button class="close-btn" onclick="closeKb()"><i class="ti ti-x"></i></button>
+      </div>
+      <div id="kb-notes"></div>
+      <div class="kb-add">
+        <input id="kb-input" placeholder="Yangi bilim qo'shing..." />
+        <button class="add-note-btn" onclick="addKnowledge()">
+          <i class="ti ti-plus"></i> Qo'shish
+        </button>
+      </div>
+      <div class="error-msg" id="kb-error"></div>
+    </div>
+  </div>
+</div>
+
+<script>
+const API = '';  // Same origin — backend serves this file
+
+let history = [];
+
+const welcomeTexts = {
+  uz: "Salom! Men sizning AI yordamchingizman. Savolingizni yozing...",
+  ru: "Привет! Я ваш AI-помощник. Напишите ваш вопрос...",
+  en: "Hello! I'm your AI assistant. Type your question..."
+};
+const placeholders = {
+  uz: "Xabar yozing...",
+  ru: "Напишите сообщение...",
+  en: "Type a message..."
+};
+const sendingTexts = {
+  uz: "Javob kutilmoqda...",
+  ru: "Ожидание ответа...",
+  en: "Waiting for response..."
+};
+
+function getTime() {
+  return new Date().toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'});
+}
+document.getElementById('welcome-time').textContent = getTime();
+
+document.getElementById('lang-sel').addEventListener('change', function() {
+  const lang = this.value;
+  document.getElementById('welcome-msg').textContent = welcomeTexts[lang];
+  document.getElementById('msg-input').placeholder = placeholders[lang];
+});
+
+async function checkStatus() {
+  try {
+    const res = await fetch(API + '/api/status', {signal: AbortSignal.timeout(3000)});
+    const data = await res.json();
+    document.getElementById('status-dot').classList.remove('offline');
+    document.getElementById('model-name').textContent = data.model || 'AI Model';
+    document.getElementById('status-text').textContent = `Ulangan | Qurilma: ${data.device || 'cpu'} | KB: ${data.knowledge_size || 0} ta`;
+  } catch(e) {
+    document.getElementById('status-dot').classList.add('offline');
+    document.getElementById('model-name').textContent = 'Offline';
+    document.getElementById('status-text').textContent = 'Backend ulanmagan';
+  }
+}
+
+function addMessage(role, text) {
+  const msgs = document.getElementById('messages');
+  const row = document.createElement('div');
+  row.className = 'msg-row' + (role === 'user' ? ' user' : '');
+  const av = document.createElement('div');
+  av.className = 'avatar ' + (role === 'user' ? 'user-av' : 'ai');
+  av.innerHTML = role === 'user'
+    ? '<i class="ti ti-user" style="font-size:15px;"></i>'
+    : '<i class="ti ti-robot" style="font-size:15px;"></i>';
+  const right = document.createElement('div');
+  const bubble = document.createElement('div');
+  bubble.className = 'bubble ' + (role === 'user' ? 'user' : 'ai');
+  bubble.textContent = text;
+  const meta = document.createElement('div');
+  meta.className = 'bubble-meta';
+  meta.textContent = getTime();
+  right.appendChild(bubble);
+  right.appendChild(meta);
+  row.appendChild(av);
+  row.appendChild(right);
+  msgs.appendChild(row);
+  msgs.scrollTop = msgs.scrollHeight;
+}
+
+function addTyping() {
+  const msgs = document.getElementById('messages');
+  const row = document.createElement('div');
+  row.className = 'msg-row'; row.id = 'typing-row';
+  row.innerHTML = `
+    <div class="avatar ai"><i class="ti ti-robot" style="font-size:15px;"></i></div>
+    <div class="bubble ai"><div class="typing-indicator"><span></span><span></span><span></span></div></div>`;
+  msgs.appendChild(row);
+  msgs.scrollTop = msgs.scrollHeight;
+}
+function removeTyping() {
+  const t = document.getElementById('typing-row');
+  if(t) t.remove();
+}
+
+async function sendMessage() {
+  const input = document.getElementById('msg-input');
+  const question = input.value.trim();
+  if(!question) return;
+  addMessage('user', question);
+  input.value = '';
+  input.style.height = 'auto';
+  const btn = document.getElementById('send-btn');
+  btn.disabled = true;
+  const lang = document.getElementById('lang-sel').value;
+  document.getElementById('status-text').textContent = sendingTexts[lang];
+  addTyping();
+  try {
+    const res = await fetch(API + '/api/chat', {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({question, history}),
+      signal: AbortSignal.timeout(120000)
+    });
+    const data = await res.json();
+    removeTyping();
+    addMessage('ai', data.answer);
+    history = data.history || history;
+    document.getElementById('hist-0').querySelector('span').textContent = question.slice(0, 22) + (question.length > 22 ? '...' : '');
+    document.getElementById('status-text').textContent = 'Tayyor';
+  } catch(e) {
+    removeTyping();
+    addMessage('ai', 'Xatolik: backend bilan ulanib bo\'lmadi.');
+    document.getElementById('status-text').textContent = 'Xatolik yuz berdi';
+  }
+  btn.disabled = false;
+}
+
+document.getElementById('msg-input').addEventListener('keydown', function(e) {
+  if(e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendMessage(); }
+});
+document.getElementById('msg-input').addEventListener('input', function() {
+  this.style.height = 'auto';
+  this.style.height = Math.min(this.scrollHeight, 100) + 'px';
+});
+
+function newChat() {
+  history = [];
+  const msgs = document.getElementById('messages');
+  msgs.innerHTML = '';
+  const lang = document.getElementById('lang-sel').value;
+  const row = document.createElement('div');
+  row.className = 'msg-row';
+  row.innerHTML = `
+    <div class="avatar ai"><i class="ti ti-robot" style="font-size:15px;"></i></div>
+    <div>
+      <div class="bubble ai">${welcomeTexts[lang]}</div>
+      <div class="bubble-meta">${getTime()}</div>
+    </div>`;
+  msgs.appendChild(row);
+  document.getElementById('hist-0').querySelector('span').textContent = 'Joriy suhbat';
+}
+
+function openKb() { document.getElementById('kb-panel').classList.add('open'); loadKbNotes(); }
+function closeKb() { document.getElementById('kb-panel').classList.remove('open'); }
+
+async function loadKbNotes() {
+  const container = document.getElementById('kb-notes');
+  container.innerHTML = '<div style="font-size:12px;color:var(--text3);">Yuklanmoqda...</div>';
+  try {
+    const res = await fetch(API + '/api/status');
+    const data = await res.json();
+    container.innerHTML = '';
+    if(!data.knowledge_size) {
+      container.innerHTML = '<div style="font-size:12px;color:var(--text3);">Bilim bazasi bo\'sh</div>';
+    } else {
+      for(let i=0; i<data.knowledge_size; i++) {
+        const n = document.createElement('div');
+        n.className = 'kb-note';
+        n.textContent = `[${i+1}] Bilim yozuvi mavjud`;
+        container.appendChild(n);
+      }
+    }
+  } catch(e) {
+    container.innerHTML = '<div style="font-size:12px;color:var(--danger);">Backend ulanmagan</div>';
+  }
+}
+
+async function addKnowledge() {
+  const inp = document.getElementById('kb-input');
+  const note = inp.value.trim();
+  if(!note) return;
+  const err = document.getElementById('kb-error');
+  try {
+    await fetch(API + '/api/knowledge', {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({note})
+    });
+    inp.value = ''; err.textContent = '';
+    loadKbNotes(); checkStatus();
+  } catch(e) {
+    err.textContent = 'Xatolik: backend ulanmagan';
+  }
+}
+
+checkStatus();
+setInterval(checkStatus, 15000);
+</script>
+</body>
+</html>
